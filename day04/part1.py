@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import os.path
+from collections.abc import Callable
 
 import pytest
 
@@ -27,6 +28,16 @@ def compute(s: str) -> int:
     return total
 
 
+def compute_heatmap(s: str) -> int:
+    points = support.parse_coords_hash(s, wall='@')
+    counts = {k: 0 for k in points}
+    for x, y in points:
+        for xc, yc in support.adjacent_8(x, y):
+            if (xc, yc) in points:
+                counts[(xc, yc)] += 1
+    return sum(val < 4 for val in counts.values())
+
+
 INPUT_S = '''\
 ..@@.@@@@.
 @@@.@.@.@@
@@ -48,7 +59,8 @@ EXPECTED = 13
         (INPUT_S, EXPECTED),
     ),
 )
-def test(input_s: str, expected: int) -> None:
+@pytest.mark.parametrize('fn', (compute, compute_heatmap))
+def test(input_s: str, expected: int, fn: Callable[[str], int]) -> None:
     assert compute(input_s) == expected
 
 
@@ -59,6 +71,9 @@ def main() -> int:
 
     with open(args.data_file) as f, support.timing():
         print(compute(f.read()))
+
+    with open(args.data_file) as f, support.timing():
+        print(compute_heatmap(f.read()))
 
     return 0
 
