@@ -14,15 +14,13 @@ def compute(s: str, *, n: int = 12) -> int:
     total = 0
     for line in s.splitlines():
         chars = []
-        left = -1
         for i in range(n):
-            left += 1
-            best = line[left]
-            for j in range(left + 1, len(line) - (n - i) + 1):
-                if line[j] > best:
-                    best = line[j]
+            left = 0
+            for j in range(1, len(line) - (n - i) + 1):
+                if line[j] > line[left]:
                     left = j
-            chars.append(best)
+            chars.append(line[left])
+            line = line[left + 1:]
         total += int(''.join(chars))
     return total
 
