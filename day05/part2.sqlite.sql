@@ -41,11 +41,7 @@ AS (
                 nn.s <= (SELECT ranges.s FROM ranges WHERE ROWID = nn.nrid) AND
                 (SELECT ranges.s FROM ranges WHERE ROWID = nn.nrid) <= nn.e
             THEN
-                CASE
-                    WHEN nn.e <= (SELECT ranges.e FROM ranges WHERE ROWID = nn.nrid)
-                    THEN (SELECT ranges.e FROM ranges WHERE ROWID = nn.nrid)
-                    ELSE nn.e
-                END
+                MAX(nn.e, (SELECT ranges.e FROM ranges WHERE ROWID = nn.nrid))
             ELSE (SELECT ranges.e FROM ranges WHERE ROWID = nn.nrid)
         END
     FROM nn
