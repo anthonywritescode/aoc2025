@@ -24,7 +24,7 @@ CREATE TABLE ops (op VARCHAR, s INT, l INT);
 WITH RECURSIVE
     nn (s, l, op, rest)
 AS (
-    SELECT 0, 0, '', s FROM opstr
+    SELECT 1, 0, '', s FROM opstr
     UNION ALL
     SELECT
         nn.s + nn.l,
@@ -40,56 +40,33 @@ AS (
 INSERT INTO ops
 SELECT nn.op, nn.s, nn.l FROM nn WHERE nn.op != '';
 
+CREATE TABLE numstrs (oprid INT, s VARCHAR);
+INSERT INTO numstrs
+SELECT ops.ROWID, SUBSTR(lines.s, ops.s, ops.l - 1)
+FROM ops, lines;
+
 WITH RECURSIVE
-    nn (acc, oprid, linerid, op)
+    nn (acc, op, arr)
 AS (
     SELECT
-        (
-            SELECT SUBSTR(lines.s, ops.s, ops.l)
-            FROM lines INNER JOIN ops
-            WHERE lines.ROWID = 1 AND ops.ROWID = 1
-        ),
-        1,
-        1,
-        (SELECT op FROM ops WHERE ROWID = 1)
+        (CASE ops.op WHEN '+' THEN 0 WHEN '*' THEN 1 ELSE '???' END),
+        ops.op,
+        json_group_array(numstrs.s)
+    FROM ops
+    INNER JOIN numstrs ON numstrs.oprid = ops.ROWID
+    GROUP BY ops.ROWID
+
     UNION ALL
+
     SELECT
-        CASE
-            WHEN nn.linerid + 1 > (SELECT MAX(ROWID) FROM lines) THEN
-                (
-                    SELECT SUBSTR(lines.s, ops.s, ops.l)
-                    FROM lines INNER JOIN ops
-                    WHERE lines.ROWID = 1 AND ops.ROWID = nn.oprid + 1
-                )
-            WHEN nn.op = '+' THEN
-                nn.acc + (
-                    SELECT SUBSTR(lines.s, ops.s, ops.l)
-                    FROM lines INNER JOIN ops
-                    WHERE lines.ROWID = nn.linerid + 1 AND ops.ROWID = nn.oprid
-                )
-            WHEN nn.op = '*' THEN
-                nn.acc * (
-                    SELECT SUBSTR(lines.s, ops.s, ops.l)
-                    FROM lines INNER JOIN ops
-                    WHERE lines.ROWID = nn.linerid + 1 AND ops.ROWID = nn.oprid
-                )
+        CASE nn.op
+            WHEN '+' THEN nn.acc + nn.arr->>'[0]'
+            WHEN '*' THEN nn.acc * nn.arr->>'[0]'
             ELSE '???'
         END,
-        CASE
-            WHEN nn.linerid + 1 > (SELECT MAX(ROWID) FROM lines) THEN
-                nn.oprid + 1
-            ELSE nn.oprid
-        END,
-        CASE
-            WHEN nn.linerid + 1 > (SELECT MAX(ROWID) FROM lines) THEN 1
-            ELSE nn.linerid + 1
-        END,
-        CASE
-            WHEN nn.linerid + 1 > (SELECT MAX(ROWID) FROM lines) THEN
-                (SELECT op FROM ops WHERE ROWID = nn.oprid + 1)
-            ELSE nn.op
-        END
+        nn.op,
+        json_remove(nn.arr, '$[0]')
     FROM nn
-    WHERE oprid <= (SELECT MAX(ROWID) FROM ops)
+    WHERE nn.arr != '[]'
 )
-SELECT SUM(nn.acc) FROM nn WHERE nn.linerid = (SELECT MAX(ROWID) FROM lines);
+SELECT SUM(nn.acc) FROM nn WHERE nn.arr = '[]';

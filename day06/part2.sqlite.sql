@@ -40,115 +40,46 @@ AS (
 INSERT INTO ops
 SELECT nn.op, nn.s, nn.l FROM nn WHERE nn.op != '';
 
-CREATE TABLE numstrs(oprid INT, numstrs VARCHAR);
-WITH RECURSIVE
-    nn (numstr, oprid, linerid)
-AS (
-    SELECT
-        (
-            SELECT SUBSTR(lines.s, ops.s, ops.l - 1)
-            FROM lines INNER JOIN ops
-            WHERE lines.ROWID = 1 AND ops.ROWID = 1
-        ),
-        1,
-        1
-    UNION ALL
-    SELECT
-        CASE
-            WHEN nn.linerid + 1 > (SELECT MAX(ROWID) FROM lines) THEN
-                (
-                    SELECT SUBSTR(lines.s, ops.s, ops.l)
-                    FROM lines INNER JOIN ops
-                    WHERE lines.ROWID = 1 AND ops.ROWID = nn.oprid + 1
-                )
-            ELSE
-                (
-                    SELECT SUBSTR(lines.s, ops.s, ops.l)
-                    FROM lines INNER JOIN ops
-                    WHERE lines.ROWID = nn.linerid + 1 AND ops.ROWID = nn.oprid
-                )
-        END,
-        CASE
-            WHEN nn.linerid + 1 > (SELECT MAX(ROWID) FROM lines) THEN
-                nn.oprid + 1
-            ELSE nn.oprid
-        END,
-        CASE
-            WHEN nn.linerid + 1 > (SELECT MAX(ROWID) FROM lines) THEN 1
-            ELSE nn.linerid + 1
-        END
-    FROM nn
-    WHERE oprid <= (SELECT MAX(ROWID) FROM ops)
-)
+CREATE TABLE orig_numstrs (oprid INT, s VARCHAR);
+INSERT INTO orig_numstrs
+SELECT ops.ROWID, SUBSTR(lines.s, ops.s, ops.l - 1)
+FROM ops, lines;
+
+CREATE TABLE numstrs (oprid INT, s VARCHAR);
 INSERT INTO numstrs
-SELECT nn.oprid, json_group_array(nn.numstr)
-FROM nn WHERE nn.oprid <= (SELECT MAX(ROWID) FROM ops)
-GROUP BY nn.oprid;
+SELECT rid, group_concat(c, '') FROM (
+    SELECT
+        ops.ROWID AS rid,
+        i.value AS i,
+        SUBSTR(orig_numstrs.s, i.value, 1) AS c
+    FROM ops, generate_series(1, ops.l - 1) AS i
+    INNER JOIN orig_numstrs ON ops.ROWID = orig_numstrs.oprid
+    ORDER BY orig_numstrs.ROWID
+) _
+GROUP BY rid, i;
 
 WITH RECURSIVE
-    nn (acc, oprid, i, l, op)
+    nn (acc, op, arr)
 AS (
     SELECT
-        (
-            SELECT (
-                SELECT group_concat(SUBSTR(value, 1, 1), '')
-                FROM json_each(numstrs.numstrs)
-            )
-            FROM numstrs WHERE ROWID = 1
-        ),
-        oprid,
-        1,
-        (SELECT ops.l FROM ops WHERE ROWID = 1),
-        (SELECT ops.op FROM ops WHERE ROWID = 1)
-    FROM numstrs WHERE oprid = 1
+        (CASE ops.op WHEN '+' THEN 0 WHEN '*' THEN 1 ELSE '???' END),
+        ops.op,
+        json_group_array(numstrs.s)
+    FROM ops
+    INNER JOIN numstrs ON numstrs.oprid = ops.ROWID
+    GROUP BY ops.ROWID
+
     UNION ALL
+
     SELECT
-        CASE
-            WHEN nn.i + 1 >= nn.l THEN
-                (
-                    SELECT (
-                        SELECT group_concat(SUBSTR(value, 1, 1), '')
-                        FROM json_each(numstrs.numstrs)
-                    )
-                    FROM numstrs WHERE numstrs.oprid = nn.oprid + 1
-                )
-            WHEN nn.op = '+' THEN
-                nn.acc + (
-                    SELECT (
-                        SELECT group_concat(SUBSTR(value, i + 1, 1), '')
-                        FROM json_each(numstrs.numstrs)
-                    )
-                    FROM numstrs WHERE ROWID = nn.oprid
-                )
-            WHEN nn.op = '*' THEN
-                nn.acc * (
-                    SELECT (
-                        SELECT group_concat(SUBSTR(value, i + 1, 1), '')
-                        FROM json_each(numstrs.numstrs)
-                    )
-                    FROM numstrs WHERE ROWID = nn.oprid
-                )
+        CASE nn.op
+            WHEN '+' THEN nn.acc + nn.arr->>'[0]'
+            WHEN '*' THEN nn.acc * nn.arr->>'[0]'
             ELSE '???'
         END,
-        CASE
-            WHEN nn.i + 1 >= nn.l THEN nn.oprid + 1
-            ELSE nn.oprid
-        END,
-        CASE
-            WHEN nn.i + 1 >= nn.l THEN 1
-            ELSE nn.i + 1
-        END,
-        CASE
-            WHEN nn.i + 1 >= nn.l THEN
-                (SELECT ops.l FROM ops WHERE ROWID = nn.oprid + 1)
-            ELSE nn.l
-        END,
-        CASE
-            WHEN nn.i + 1 >= nn.l THEN
-                (SELECT ops.op FROM ops WHERE ROWID = nn.oprid + 1)
-            ELSE nn.op
-        END
+        nn.op,
+        json_remove(nn.arr, '$[0]')
     FROM nn
-    WHERE nn.oprid <= (SELECT MAX(oprid) FROM numstrs)
+    WHERE nn.arr != '[]'
 )
-SELECT SUM(nn.acc) FROM nn WHERE nn.i + 1 = nn.l;
+SELECT SUM(nn.acc) FROM nn WHERE nn.arr = '[]';
