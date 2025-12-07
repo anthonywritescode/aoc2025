@@ -18,9 +18,7 @@ FROM json_each((
 ORDER BY value->>'[0]';
 
 CREATE TABLE new_ranges (s INT, e INT);
-WITH RECURSIVE
-    nn (nrid, s, e)
-AS (
+WITH RECURSIVE nn (nrid, s, e) AS (
     SELECT ROWID + 1, s, e FROM ranges WHERE ROWID = 1
     UNION ALL
     SELECT

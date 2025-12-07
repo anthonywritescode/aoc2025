@@ -2,9 +2,7 @@ CREATE TABLE input (s VARCHAR);
 INSERT INTO input VALUES (TRIM(readfile('input.txt'), char(10)));
 
 CREATE TABLE coords (x INT, y INT);
-WITH RECURSIVE
-    nn (y, x, wall, rest)
-AS (
+WITH RECURSIVE nn (y, x, wall, rest) AS (
     SELECT 0, -1, FALSE, (SELECT s || char(10) FROM input)
     UNION ALL
     SELECT

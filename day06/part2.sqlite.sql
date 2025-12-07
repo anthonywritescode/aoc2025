@@ -21,9 +21,7 @@ ORDER BY ROWID DESC
 LIMIT 1;
 
 CREATE TABLE ops (op VARCHAR, s INT, l INT);
-WITH RECURSIVE
-    nn (s, l, op, rest)
-AS (
+WITH RECURSIVE nn (s, l, op, rest) AS (
     SELECT 1, 0, '', s FROM opstr
     UNION ALL
     SELECT
@@ -58,9 +56,7 @@ SELECT rid, group_concat(c, '') FROM (
 ) _
 GROUP BY rid, i;
 
-WITH RECURSIVE
-    nn (acc, op, arr)
-AS (
+WITH RECURSIVE nn (acc, op, arr) AS (
     SELECT
         (CASE ops.op WHEN '+' THEN 0 WHEN '*' THEN 1 ELSE '???' END),
         ops.op,

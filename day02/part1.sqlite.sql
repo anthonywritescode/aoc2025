@@ -9,9 +9,7 @@ FROM json_each((
     FROM input
 ));
 
-WITH RECURSIVE
-    nn (n, e)
-AS (
+WITH RECURSIVE nn (n, e) AS (
     SELECT s, e FROM ranges
     UNION ALL
     SELECT nn.n + 1, e FROM nn

@@ -8,9 +8,7 @@ SELECT value FROM json_each((
     SELECT '["' || REPLACE(s, char(10), '","') || '"]' FROM input
 ));
 
-WITH RECURSIVE
-    nn (chars, i, j, left, line, n)
-AS (
+WITH RECURSIVE nn (chars, i, j, left, line, n) AS (
     SELECT '', 0, 0, 0, s, (SELECT n FROM input) FROM lines
     UNION ALL
     SELECT

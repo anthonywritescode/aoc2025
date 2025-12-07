@@ -13,9 +13,7 @@ FROM json_each((
 CREATE TABLE splitme (d INT);
 INSERT INTO splitme VALUES (1), (-1);
 
-WITH RECURSIVE
-    nn (rid, positions)
-AS (
+WITH RECURSIVE nn (rid, positions) AS (
     SELECT ROWID, json_array(json_array(INSTR(s, 'S'), 1))
     FROM lines WHERE ROWID = 1
     UNION ALL

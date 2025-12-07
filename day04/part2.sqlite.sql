@@ -2,9 +2,7 @@ CREATE TABLE input (s VARCHAR);
 INSERT INTO input VALUES (TRIM(readfile('input.txt'), char(10)));
 
 CREATE TABLE coords (x INT, y INT);
-WITH RECURSIVE
-    nn (y, x, wall, rest)
-AS (
+WITH RECURSIVE nn (y, x, wall, rest) AS (
     SELECT 0, -1, FALSE, (SELECT s || char(10) FROM input)
     UNION ALL
     SELECT
@@ -41,9 +39,7 @@ INNER JOIN coords AS coords2 ON
     coords.x + dx = coords2.x AND coords.y + dy = coords2.y
 GROUP BY coords.x + dx, coords.y + dy;
 
-WITH RECURSIVE
-    nn (total, state)
-AS (
+WITH RECURSIVE nn (total, state) AS (
     SELECT 0, (SELECT json_group_array(json_array(x, y, n)) FROM counts)
     UNION ALL
     SELECT

@@ -11,9 +11,7 @@ SELECT value FROM json_each((
     FROM input
 ));
 
-WITH RECURSIVE
-    nn (total, pos, rid)
-AS (
+WITH RECURSIVE nn (total, pos, rid) AS (
     SELECT 0, 50, 1
     UNION ALL
     SELECT

@@ -10,9 +10,7 @@ FROM json_each((
 ));
 
 CREATE TABLE numbers (n VARCHAR, l2 INT);
-WITH RECURSIVE
-    nn (n, e)
-AS (
+WITH RECURSIVE nn (n, e) AS (
     SELECT s, e FROM ranges
     UNION ALL
     SELECT nn.n + 1, e FROM nn
@@ -22,9 +20,7 @@ INSERT INTO numbers
 SELECT nn.n, LENGTH(nn.n) / 2 FROM nn;
 
 CREATE TABLE answers(n INT);
-WITH RECURSIVE
-    nn (arr, rest, n, chunksize)
-AS (
+WITH RECURSIVE nn (arr, rest, n, chunksize) AS (
     SELECT json_array(), n, n, cs.value
     FROM numbers, generate_series(1, numbers.l2) AS cs
     UNION ALL
