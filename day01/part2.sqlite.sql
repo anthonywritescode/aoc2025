@@ -1,37 +1,34 @@
 CREATE TABLE input (s VARCHAR);
 INSERT INTO input VALUES (TRIM(readfile('input.txt'), char(10)));
 
-CREATE TABLE positions (pos INT);
+CREATE TABLE dials (n INT);
+INSERT INTO dials
+SELECT value FROM json_each((
+    SELECT
+        '[' ||
+        REPLACE(REPLACE(REPLACE(s, 'L', '-'), 'R', ''), char(10), ',') ||
+        ']'
+    FROM input
+));
+
 WITH RECURSIVE
-    nn (pos, sign, rem, rest)
+    nn (total, pos, rid)
 AS (
-    SELECT 50, 1, 0, (SELECT s || char(10) FROM input)
+    SELECT 0, 50, 1
     UNION ALL
     SELECT
-        CASE nn.rem
-            WHEN 0 THEN nn.pos
-            ELSE (nn.pos + sign + 100) % 100
-        END,
-        CASE nn.rem
-            WHEN 0 THEN
-                CASE SUBSTR(nn.rest, 1, 1)
-                    WHEN 'L' THEN -1
-                    ELSE 1
-                END
-            ELSE nn.sign
-        END,
-        CASE nn.rem
-            WHEN 0 THEN SUBSTR(nn.rest, 2, INSTR(nn.rest, char(10)) - 2)
-            ELSE nn.rem - 1
-        END,
-        CASE nn.rem
-            WHEN 0 THEN SUBSTR(nn.rest, INSTR(nn.rest, char(10)) + 1)
-            ELSE nn.rest
-        END
+        (
+            nn.total +
+            ABS((SELECT n FROM dials WHERE ROWID = nn.rid)) / 100 +
+            (
+                nn.pos > 0 AND
+                nn.pos + (SELECT n FROM dials WHERE ROWID = nn.rid) % 100 <= 0
+            ) +
+            (nn.pos + (SELECT n FROM dials WHERE ROWID = nn.rid) % 100 >= 100)
+        ),
+        (nn.pos + (SELECT n FROM dials WHERE ROWID = nn.rid) + 1000) % 100,
+        nn.rid + 1
     FROM nn
-    WHERE nn.rem != 0 OR nn.rest != ''
+    WHERE nn.rid <= (SELECT MAX(ROWID) FROM dials)
 )
-INSERT INTO positions
-SELECT nn.pos FROM nn WHERE nn.rem != 0;
-
-SELECT COUNT(1) FROM positions WHERE pos = 0;
+SELECT MAX(total) FROM nn;

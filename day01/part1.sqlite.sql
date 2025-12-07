@@ -1,31 +1,25 @@
 CREATE TABLE input (s VARCHAR);
 INSERT INTO input VALUES (TRIM(readfile('input.txt'), char(10)));
 
-CREATE TABLE positions (pos INT);
+CREATE TABLE dials (n INT);
+INSERT INTO dials
+SELECT value FROM json_each((
+    SELECT
+        '[' ||
+        REPLACE(REPLACE(REPLACE(s, 'L', '-'), 'R', ''), char(10), ',') ||
+        ']'
+    FROM input
+));
+
 WITH RECURSIVE
-    nn (pos, rest)
+    nn (pos, rid)
 AS (
-    SELECT 50, (SELECT s || char(10) FROM input)
+    SELECT 50, 1
     UNION ALL
     SELECT
-        (
-            nn.pos +
-            REPLACE(
-                REPLACE(
-                    SUBSTR(nn.rest, 0, INSTR(nn.rest, char(10))),
-                    'L',
-                    '-'
-                ),
-                'R',
-                ''
-            )
-            + 100 * 100
-        ) % 100,
-        SUBSTR(nn.rest, INSTR(nn.rest, char(10)) + 1)
+        (nn.pos + (SELECT n FROM dials WHERE ROWID = nn.rid) + 1000) % 100,
+        nn.rid + 1
     FROM nn
-    WHERE nn.rest != ''
+    WHERE nn.rid <= (SELECT MAX(ROWID) FROM dials)
 )
-INSERT INTO positions
-SELECT nn.pos FROM nn;
-
-SELECT COUNT(1) FROM positions WHERE pos = 0;
+SELECT COUNT(1) FROM nn WHERE pos = 0;
