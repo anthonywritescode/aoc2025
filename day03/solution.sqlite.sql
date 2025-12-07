@@ -1,4 +1,4 @@
-CREATE TABLE input (n INT, s STRING);
+CREATE TABLE input (n INT, s VARCHAR);
 -- adjust `n` for part 1 (2) or part 2 (12)
 INSERT INTO input VALUES (12, TRIM(readfile('input.txt'), char(10)));
 

@@ -1,7 +1,7 @@
-CREATE TABLE input (s STRING);
+CREATE TABLE input (s VARCHAR);
 INSERT INTO input VALUES (TRIM(readfile('input.txt'), char(10)));
 
-CREATE TABLE lines (s STRING);
+CREATE TABLE lines (s VARCHAR);
 INSERT INTO lines
 SELECT value
 FROM json_each((
@@ -10,7 +10,7 @@ FROM json_each((
     FROM input
 ));
 
-CREATE TABLE opstr (s STRING);
+CREATE TABLE opstr (s VARCHAR);
 INSERT INTO opstr
 SELECT s || '+*' FROM lines
 ORDER BY ROWID DESC
@@ -20,7 +20,7 @@ DELETE FROM lines
 ORDER BY ROWID DESC
 LIMIT 1;
 
-CREATE TABLE ops (op STRING, s INT, l INT);
+CREATE TABLE ops (op VARCHAR, s INT, l INT);
 WITH RECURSIVE
     nn (s, l, op, rest)
 AS (

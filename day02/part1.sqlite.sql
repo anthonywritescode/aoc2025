@@ -1,7 +1,7 @@
-CREATE TABLE input (s STRING);
+CREATE TABLE input (s VARCHAR);
 INSERT INTO input VALUES (TRIM(readfile('simple.txt'), char(10)));
 
-CREATE TABLE numbers (n STRING);
+CREATE TABLE numbers (n VARCHAR);
 WITH RECURSIVE
     nn (n, bound, rest)
 AS (

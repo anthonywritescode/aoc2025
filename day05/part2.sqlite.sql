@@ -1,4 +1,4 @@
-CREATE TABLE input (s STRING);
+CREATE TABLE input (s VARCHAR);
 INSERT INTO input VALUES (TRIM(readfile('input.txt'), char(10)));
 
 CREATE TABLE ranges (s INT, e INT);
