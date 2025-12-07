@@ -23,27 +23,18 @@ SELECT nn.n, LENGTH(nn.n) / 2 FROM nn;
 
 CREATE TABLE answers(n INT);
 WITH RECURSIVE
-    nn (chunksize, arr, rest, n, l2)
+    nn (arr, rest, n, chunksize)
 AS (
-    SELECT 1, json_array(), n, n, l2 FROM numbers
+    SELECT json_array(), n, n, cs.value
+    FROM numbers, generate_series(1, numbers.l2) AS cs
     UNION ALL
     SELECT
-        CASE
-            WHEN nn.rest = '' THEN nn.chunksize + 1
-            ELSE nn.chunksize
-        END,
-        CASE
-            WHEN nn.rest = '' THEN json_array()
-            ELSE json_insert(nn.arr, '$[#]', SUBSTR(nn.rest, 1, nn.chunksize))
-        END,
-        CASE
-            WHEN nn.rest = '' THEN nn.n
-            ELSE SUBSTR(nn.rest, 1 + nn.chunksize)
-        END,
+        json_insert(nn.arr, '$[#]', SUBSTR(nn.rest, 1, nn.chunksize)),
+        SUBSTR(nn.rest, 1 + nn.chunksize),
         nn.n,
-        nn.l2
+        nn.chunksize
     FROM nn
-    WHERE nn.chunksize <= nn.l2
+    WHERE nn.rest != ''
 )
 SELECT SUM(DISTINCT nn.n) FROM nn
 WHERE
