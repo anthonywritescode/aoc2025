@@ -1,36 +1,21 @@
 CREATE TABLE input (s VARCHAR);
-INSERT INTO input VALUES (TRIM(readfile('simple.txt'), char(10)));
+INSERT INTO input VALUES (TRIM(readfile('input.txt'), char(10)));
 
-CREATE TABLE numbers (n VARCHAR);
+CREATE TABLE ranges (s INT, e INT);
+INSERT INTO ranges
+SELECT value->>'[0]', value->>'[1]'
+FROM json_each((
+    SELECT '[[' || REPLACE(REPLACE(s, ',', '],['), '-', ',') || ']]'
+    FROM input
+));
+
 WITH RECURSIVE
-    nn (n, bound, rest)
+    nn (n, e)
 AS (
-    SELECT 1, 0, (SELECT s || ',' FROM input)
+    SELECT s, e FROM ranges
     UNION ALL
-    SELECT
-        CASE
-            WHEN nn.n > nn.bound THEN
-                1 * SUBSTR(nn.rest, 1, INSTR(nn.rest, '-') - 1)
-            ELSE nn.n + 1
-        END,
-        CASE
-            WHEN nn.n > nn.bound THEN
-                1 * SUBSTR(
-                    nn.rest,
-                    INSTR(nn.rest, '-') + 1,
-                    INSTR(nn.rest, ',') - INSTR(nn.rest, '-') - 1
-                )
-            ELSE nn.bound
-        END,
-        CASE
-            WHEN nn.n > nn.bound THEN SUBSTR(nn.rest, INSTR(nn.rest, ',') + 1)
-            ELSE nn.rest
-        END
-    FROM nn
-    WHERE nn.n <= bound OR nn.rest != ''
+    SELECT nn.n + 1, e FROM nn
+    WHERE nn.n < e
 )
-INSERT INTO numbers
-SELECT nn.n FROM nn WHERE nn.n <= nn.bound;
-
-SELECT sum(n) FROM numbers
+SELECT SUM(n) FROM nn
 WHERE SUBSTR(n, 1, LENGTH(n) / 2) = SUBSTR(n, LENGTH(n) / 2 + 1);

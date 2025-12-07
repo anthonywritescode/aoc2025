@@ -1,59 +1,34 @@
 CREATE TABLE input (s VARCHAR);
 INSERT INTO input VALUES (TRIM(readfile('input.txt'), char(10)));
 
+CREATE TABLE ranges (s INT, e INT);
+INSERT INTO ranges
+SELECT value->>'[0]', value->>'[1]'
+FROM json_each((
+    SELECT '[[' || REPLACE(REPLACE(s, ',', '],['), '-', ',') || ']]'
+    FROM input
+));
+
 CREATE TABLE numbers (n VARCHAR, l2 INT);
 WITH RECURSIVE
-    nn (n, bound, rest)
+    nn (n, e)
 AS (
-    SELECT 1, 0, (SELECT s || ',' FROM input)
+    SELECT s, e FROM ranges
     UNION ALL
-    SELECT
-        CASE
-            WHEN nn.n > nn.bound THEN
-                1 * SUBSTR(nn.rest, 1, INSTR(nn.rest, '-') - 1)
-            ELSE nn.n + 1
-        END,
-        CASE
-            WHEN nn.n > nn.bound THEN
-                1 * SUBSTR(
-                    nn.rest,
-                    INSTR(nn.rest, '-') + 1,
-                    INSTR(nn.rest, ',') - INSTR(nn.rest, '-') - 1
-                )
-            ELSE nn.bound
-        END,
-        CASE
-            WHEN nn.n > nn.bound THEN SUBSTR(nn.rest, INSTR(nn.rest, ',') + 1)
-            ELSE nn.rest
-        END
-    FROM nn
-    WHERE nn.n <= bound OR nn.rest != ''
+    SELECT nn.n + 1, e FROM nn
+    WHERE nn.n < e
 )
 INSERT INTO numbers
-SELECT nn.n, LENGTH(nn.n) / 2 FROM nn
-WHERE nn.n <= nn.bound AND LENGTH(nn.n) > 1;
+SELECT nn.n, LENGTH(nn.n) / 2 FROM nn;
 
-CREATE TABLE answers(rid INT);
+CREATE TABLE answers(n INT);
 WITH RECURSIVE
-    nn (rid, chunksize, arr, rest)
+    nn (chunksize, arr, rest, n, l2)
 AS (
-    SELECT 1, 1, json_array(), (SELECT n FROM numbers WHERE ROWID = 1)
+    SELECT 1, json_array(), n, n, l2 FROM numbers
     UNION ALL
     SELECT
         CASE
-            WHEN (
-                nn.rest = '' AND
-                nn.chunksize >= (SELECT l2 FROM numbers WHERE ROWID = nn.rid)
-            )
-            THEN nn.rid + 1
-            ELSE nn.rid
-        END,
-        CASE
-            WHEN (
-                nn.rest = '' AND
-                nn.chunksize >= (SELECT l2 FROM numbers WHERE ROWID = nn.rid)
-            )
-            THEN 1
             WHEN nn.rest = '' THEN nn.chunksize + 1
             ELSE nn.chunksize
         END,
@@ -62,23 +37,16 @@ AS (
             ELSE json_insert(nn.arr, '$[#]', SUBSTR(nn.rest, 1, nn.chunksize))
         END,
         CASE
-            WHEN (
-                nn.rest = '' AND
-                nn.chunksize >= (SELECT l2 FROM numbers WHERE ROWID = nn.rid)
-            )
-            THEN (SELECT n FROM numbers WHERE ROWID = nn.rid + 1)
-            WHEN nn.rest = '' THEN (SELECT n FROM numbers WHERE ROWID = nn.rid)
+            WHEN nn.rest = '' THEN nn.n
             ELSE SUBSTR(nn.rest, 1 + nn.chunksize)
-        END
+        END,
+        nn.n,
+        nn.l2
     FROM nn
-    WHERE nn.rid <= (SELECT MAX(ROWID) FROM numbers) OR nn.rest != ''
+    WHERE nn.chunksize <= nn.l2
 )
-INSERT INTO answers
-SELECT nn.rid FROM nn
+SELECT SUM(DISTINCT nn.n) FROM nn
 WHERE
     nn.rest = '' AND
     (SELECT COUNT(DISTINCT value) FROM json_each(nn.arr)) = 1
-GROUP BY nn.rid;
-
-SELECT SUM(numbers.n) FROM answers
-INNER JOIN numbers ON answers.rid = numbers.ROWID;
+;
