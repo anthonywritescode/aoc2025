@@ -37,7 +37,6 @@ AS (
                         ) = '^'
                 ) _
                 GROUP BY k
-                ORDER BY k
             ) _
         )
     FROM nn
