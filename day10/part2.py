@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import fractions
 import math
 import os.path
 import string
@@ -137,7 +136,7 @@ def _parse_button(s: str) -> frozenset[int]:
 
 def _reduce(rows: list[tuple[int, ...]]) -> list[tuple[int, ...]]:
     """roughly translated from wikipedia gaussian elimination"""
-    mut = [[fractions.Fraction(n) for n in row] for row in rows]
+    mut = [list(row) for row in rows]
     m = len(mut)
     n = len(mut[0])
     h = k = 0
@@ -148,23 +147,21 @@ def _reduce(rows: list[tuple[int, ...]]) -> list[tuple[int, ...]]:
         else:
             mut[h], mut[i_max] = mut[i_max], mut[h]
             for i in range(h + 1, m):
-                f = fractions.Fraction(mut[i][k], mut[h][k])
-                mut[i][k] = fractions.Fraction(0)
+                num, den = mut[i][k], mut[h][k]
+                mut[i][k] = 0
                 for j in range(k + 1, n):
-                    mut[i][j] = mut[i][j] - mut[h][j] * f
+                    mut[i][j] = mut[i][j] * den - mut[h][j] * num
             h += 1
             k += 1
 
-    # un-fraction
+    # row elimination / gcd
     new = []
     for row in mut:
         if not any(row):
             continue
 
-        lcm = math.lcm(*(v.denominator for v in row))
-        ints = [int(n * lcm) for n in row]
-        gcd = math.gcd(*ints)
-        ints = [n // gcd for n in ints]
+        gcd = math.gcd(*row)
+        ints = [n // gcd for n in row]
         new.append(tuple(ints))
 
     # TODO: can still eliminate variables
