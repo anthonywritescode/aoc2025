@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import argparse
-import concurrent.futures
-import functools
+import fractions
 import math
 import os.path
 import string
 import sys
+from typing import Literal
 from typing import NamedTuple
 from typing import Self
 
@@ -33,48 +33,30 @@ class Equation(NamedTuple):
     const: int
 
     @property
+    def termsign(self) -> Literal[-1, 0, 1]:
+        it = iter(self.terms)
+        ret: Literal[-1, 1] = -1 if next(it).k < 0 else 1
+        for other in it:
+            if ret == 1 and other.k < 0:
+                return 0
+            elif ret == -1 and other.k > 0:
+                return 0
+        else:
+            return ret
+
+    @property
     def illegal(self) -> bool:
+        if not self.terms and self.const:
+            return True
+        termsign = self.termsign
         return (
-            self.const < 0 or
-            (self.const and not self.terms) or
+            (termsign == 1 and self.const < 0) or
+            (termsign == -1 and self.const > 0) or
             (
                 len(self.terms) == 1 and
                 self.const % next(iter(self.terms)).k != 0
             )
         )
-
-    @classmethod
-    def make(cls, terms: frozenset[Term], const: int) -> Self:
-        assert all(term.k > 0 for term in terms), terms
-        gcd = math.gcd(const, *(term.k for term in terms))
-        if gcd == 0 or gcd == 1:
-            return cls(terms, const)
-        else:
-            terms = frozenset(Term(var, k // gcd) for var, k in terms)
-            return cls(terms, const // gcd)
-
-    def subtract(self, other: Equation) -> Equation | None:
-        if self.terms > other.terms:
-            terms = self.terms - other.terms
-            return type(self).make(terms, self.const - other.const)
-
-        elif all(term.k == 1 for term in other.terms):
-            s_terms = {term.var: term.k for term in self.terms}
-            other_vars = {term.var for term in other.terms}
-            if s_terms.keys() > other_vars:
-                n = min(v for k, v in s_terms.items() if k in other_vars)
-                for k in other_vars:
-                    s_terms[k] -= n
-                terms = frozenset(
-                    Term(var, k)
-                    for var, k in s_terms.items()
-                    if k
-                )
-                return type(self).make(terms, self.const - other.const * n)
-            else:
-                return None
-        else:
-            return None
 
     def solve(self) -> tuple[str, int]:
         term, = self.terms
@@ -86,10 +68,7 @@ class Equation(NamedTuple):
             return self
         removed, = (term for term in self.terms if term.var == var)
         terms = frozenset(term for term in self.terms if term.var != var)
-        # assert terms or self.const == n, self
-        # if not terms:
-        #     breakpoint()
-        return type(self).make(terms, self.const - removed.k * n)
+        return type(self)(terms, self.const - removed.k * n)
 
     def __repr__(self) -> str:
         lhs = ' + '.join(repr(term) for term in sorted(self.terms))
@@ -103,111 +82,149 @@ System = frozenset[Equation]
 
 
 def _substitute(system: System, var: str, n: int) -> System:
-    return _simplify(frozenset(eq.substitute(var, n) for eq in system))
+    return frozenset(eq.substitute(var, n) for eq in system)
 
 
-def _simplify(system: System) -> System:
-    if any(eq.illegal for eq in system):
-        return system
-    elif _TRIVIAL_EQUATION in system:
-        return _simplify(system - {_TRIVIAL_EQUATION})
+def _pick_var(system: System, bounds: dict[str, int]) -> tuple[str, int]:
+    mineq = min(
+        system,
+        # TODO: I'm getting lucky? this should be `abs(eq.const)`
+        # but that makes it 4x slower
+        key=lambda eq: (len(eq.terms), eq.const, sorted(eq.terms)),
+    )
+    var = sorted(mineq.terms)[-1].var
 
-    for equation in system:
-        if equation.const == 0:
-            for term in equation.terms:
-                system = _substitute(system, term.var, 0)
-            return _simplify(system)
-
-    for equation in system:
-        for other in system:
-            if equation is other:
-                continue
-
-            new_eq = equation.subtract(other)
-            if new_eq is not None:
-                return _simplify((system - {equation}) | {new_eq})
-    return system
-
-
-def _solve_var(system: System) -> tuple[int | None, System]:
-    for equation in system:
-        if len(equation.terms) == 1:
-            var, n = equation.solve()
-            return n, _simplify(_substitute(system, var, n))
-    else:
-        return None, _simplify(system)
-
-
-def _pick_var(system: System) -> tuple[str, int]:
-    # TODO: optimize? rarest? shortest equation?
-    var = min(term.var for eq in system for term in eq.terms)
-    high = sys.maxsize
+    high = bounds[var]
     for eq in system:
         matching = next((t for t in eq.terms if t.var == var), None)
         if matching is not None:
-            high = min(high, eq.const // matching.k)
+            termsign = eq.termsign
+            if (
+                    (termsign == 1 and eq.const >= 0) or
+                    (termsign == -1 and eq.const <= 0)
+            ):
+                high = min(high, abs(eq.const // matching.k))
     return var, high
 
 
-@functools.lru_cache(maxsize=2 ** 15)
-def _compute_one(system: System) -> int:
+def _compute_one(system: System, bounds: dict[str, int]) -> int:
+    if _TRIVIAL_EQUATION in system:
+        system = system - {_TRIVIAL_EQUATION}
     if not system:
         return 0
     elif any(eq.illegal for eq in system):
         return sys.maxsize
 
-    n, system = _solve_var(system)
-    if n is not None:
-        return n + _compute_one(system)
+    for equation in system:
+        if len(equation.terms) == 1:
+            var, n = equation.solve()
+            return n + _compute_one(_substitute(system, var, n), bounds)
+        elif equation.const == 0 and equation.termsign != 0:
+            for term in equation.terms:
+                system = _substitute(system, term.var, 0)
+            return _compute_one(system, bounds)
 
-    var, high = _pick_var(system)
+    var, high = _pick_var(system, bounds)
     return min(
-        i + _compute_one(_substitute(system, var, i))
+        i + _compute_one(_substitute(system, var, i), bounds)
         for i in range(high + 1)
     )
 
 
 def _parse_button(s: str) -> frozenset[int]:
-    idxs = frozenset(int(n_s) for n_s in s[1:-1].split(','))
-    return idxs
+    return frozenset(int(n_s) for n_s in s[1:-1].split(','))
+
+
+def _reduce(rows: list[tuple[int, ...]]) -> list[tuple[int, ...]]:
+    """roughly translated from wikipedia gaussian elimination"""
+    mut = [[fractions.Fraction(n) for n in row] for row in rows]
+    m = len(mut)
+    n = len(mut[0])
+    h = k = 0
+    while h < m and k < n:
+        i_max = max(range(h, m), key=lambda i: mut[i][k])
+        if mut[i_max][k] == 0:
+            k += 1
+        else:
+            mut[h], mut[i_max] = mut[i_max], mut[h]
+            for i in range(h + 1, m):
+                f = fractions.Fraction(mut[i][k], mut[h][k])
+                mut[i][k] = fractions.Fraction(0)
+                for j in range(k + 1, n):
+                    mut[i][j] = mut[i][j] - mut[h][j] * f
+            h += 1
+            k += 1
+
+    # un-fraction
+    new = []
+    for row in mut:
+        if not any(row):
+            continue
+
+        lcm = math.lcm(*(v.denominator for v in row))
+        ints = [int(n * lcm) for n in row]
+        gcd = math.gcd(*ints)
+        ints = [n // gcd for n in ints]
+        new.append(tuple(ints))
+
+    # TODO: can still eliminate variables
+    # (Pdb) pp new
+    # [(4, 2, 2, 2, 2, 4, 102),
+    #  (0, 1, 0, 1, 0, 1, 8),  # <==
+    #  (0, 0, 1, 2, 1, 1, 31),
+    #  (0, 0, 0, 1, 0, 1, 3),  # <==
+    #  (0, 0, 0, 0, 1, 0, 18),
+    #  (0, 0, 0, 0, 0, 0, 0),
+    #  (0, 0, 0, 0, 0, 0, 0)]
+
+    return new
 
 
 def _to_system(
         buttons: list[frozenset[int]],
         target: list[int],
-) -> System:
+) -> tuple[System, dict[str, int]]:
+    rows = [
+        (*(len(b) for b in buttons), sum(target)),
+        *(
+            (*(int(i in b) for b in buttons), n)
+            for i, n in enumerate(target)
+        ),
+    ]
+    rows = _reduce(rows)
     equations = []
-    for i, n in enumerate(target):
+    for row in rows:
         lhs = frozenset(
-            Term(letter, 1)
-            for letter, button in zip(string.ascii_letters, buttons)
-            if i in button
+            Term(letter, k)
+            for letter, k in zip(string.ascii_letters, row[:-1])
+            if k
         )
-        equations.append(Equation.make(lhs, n))
-    lhs = frozenset(
-        Term(letter, len(button))
+        equations.append(Equation(lhs, row[-1]))
+
+    tsum = sum(target)
+    bounds = {
+        letter: min(
+            tsum // len(button),
+            min(target[idx] for idx in button),
+        )
         for letter, button in zip(string.ascii_letters, buttons)
-    )
-    equations.append(Equation.make(lhs, sum(target)))
-    return frozenset(equations)
+    }
+
+    return frozenset(equations), bounds
 
 
 def compute(s: str) -> int:
     total = 0
-    with concurrent.futures.ProcessPoolExecutor() as exe:
-        futures = []
-        for line in s.splitlines():
-            _, *buttons_s, target_s = line.split()
+    for line in s.splitlines():
+        _, *buttons_s, target_s = line.split()
 
-            target = [int(s) for s in target_s[1:-1].split(',')]
-            buttons = [_parse_button(s) for s in buttons_s]
-            system = _to_system(buttons, target)
+        target = [int(s) for s in target_s[1:-1].split(',')]
+        buttons = [_parse_button(s) for s in buttons_s]
+        system, bounds = _to_system(buttons, target)
 
-            futures.append(exe.submit(_compute_one, system))
-
-        for res in concurrent.futures.as_completed(futures):
-            print('.', end='', flush=True)
-            total += res.result()
+        print('.', end='', flush=True)
+        total += _compute_one(system, bounds)
+        assert total < sys.maxsize
     return total
 
 
@@ -227,17 +244,6 @@ EXPECTED = 33
 )
 def test(input_s: str, expected: int) -> None:
     assert compute(input_s) == expected
-
-
-@pytest.mark.parametrize(
-    'eq',
-    (
-        Equation.make(frozenset((Term('a', 1),)), -1),
-        Equation.make(frozenset(), 1),
-    ),
-)
-def test_equation_is_illegal(eq: Equation) -> None:
-    assert eq.illegal
 
 
 def main() -> int:
