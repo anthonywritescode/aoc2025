@@ -91,7 +91,7 @@ def _pick_var(system: System, bounds: dict[str, int]) -> tuple[str, int]:
         # but that makes it 4x slower
         key=lambda eq: (len(eq.terms), eq.const, sorted(eq.terms)),
     )
-    var = sorted(mineq.terms)[-1].var
+    var = max(mineq.terms).var
 
     high = bounds[var]
     for eq in system:
@@ -134,6 +134,19 @@ def _parse_button(s: str) -> frozenset[int]:
     return frozenset(int(n_s) for n_s in s[1:-1].split(','))
 
 
+def _substitutable(f: list[int], t: list[int]) -> int | None:
+    factor = None
+    for f_n, t_n in zip(f, t):
+        if f_n == 0:
+            continue
+        elif t_n == 0:
+            return None
+        elif t_n % f_n == 0:
+            factor = t_n // f_n
+    else:
+        return factor
+
+
 def _reduce(rows: list[tuple[int, ...]]) -> list[tuple[int, ...]]:
     """roughly translated from wikipedia gaussian elimination"""
     mut = [list(row) for row in rows]
@@ -154,27 +167,28 @@ def _reduce(rows: list[tuple[int, ...]]) -> list[tuple[int, ...]]:
             h += 1
             k += 1
 
-    # row elimination / gcd
-    new = []
+    while mut and not any(mut[-1]):
+        mut.pop()
+
+    def _gcd(lst: list[int]) -> None:
+        gcd = math.gcd(*lst)
+        lst[:] = [n // gcd for n in lst]
+
     for row in mut:
-        if not any(row):
-            continue
+        _gcd(row)
 
-        gcd = math.gcd(*row)
-        ints = [n // gcd for n in row]
-        new.append(tuple(ints))
+    for i in reversed(range(1, len(mut))):
+        start = next(i for i, val in enumerate(mut[i]) if val)
+        chunk = mut[i][start:-1]
+        for j in range(i):
+            factor = _substitutable(chunk, mut[j][start:-1])
+            if factor is not None:
+                for k, n in enumerate(chunk):
+                    mut[j][start + k] -= factor * n
+                mut[j][-1] -= factor * mut[i][-1]
+                _gcd(mut[j])
 
-    # TODO: can still eliminate variables
-    # (Pdb) pp new
-    # [(4, 2, 2, 2, 2, 4, 102),
-    #  (0, 1, 0, 1, 0, 1, 8),  # <==
-    #  (0, 0, 1, 2, 1, 1, 31),
-    #  (0, 0, 0, 1, 0, 1, 3),  # <==
-    #  (0, 0, 0, 0, 1, 0, 18),
-    #  (0, 0, 0, 0, 0, 0, 0),
-    #  (0, 0, 0, 0, 0, 0, 0)]
-
-    return new
+    return [tuple(row) for row in mut]
 
 
 def _to_system(
