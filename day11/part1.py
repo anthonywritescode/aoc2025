@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import collections
 import os.path
+from collections.abc import Callable
 
 import pytest
 
@@ -29,6 +30,28 @@ def compute(s: str) -> int:
     return len(paths)
 
 
+def compute_sqlike(s: str) -> int:
+    edges = {}
+    for line in s.splitlines():
+        k, rest = line.split(': ')
+        edges[k] = rest.split()
+
+    seen = {(k, 'out') for k in edges}
+
+    unknown = set(seen)
+    known = {('out', 'out'): 1}
+
+    while unknown:
+        removed = []
+        for (k, v) in unknown:
+            if all((u, v) in known for u in edges[k]):
+                removed.append((k, v))
+                known[(k, v)] = sum(known[(u, v)] for u in edges[k])
+        unknown.difference_update(removed)
+
+    return known[('you', 'out')]
+
+
 INPUT_S = '''\
 aaa: you hhh
 you: bbb ccc
@@ -50,8 +73,9 @@ EXPECTED = 5
         (INPUT_S, EXPECTED),
     ),
 )
-def test(input_s: str, expected: int) -> None:
-    assert compute(input_s) == expected
+@pytest.mark.parametrize('fn', (compute, compute_sqlike))
+def test(input_s: str, expected: int, fn: Callable[[str], int]) -> None:
+    assert fn(input_s) == expected
 
 
 def main() -> int:
@@ -61,6 +85,9 @@ def main() -> int:
 
     with open(args.data_file) as f, support.timing():
         print(compute(f.read()))
+
+    with open(args.data_file) as f, support.timing('sqlike'):
+        print(compute_sqlike(f.read()))
 
     return 0
 

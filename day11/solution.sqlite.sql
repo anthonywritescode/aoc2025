@@ -86,7 +86,6 @@ WITH RECURSIVE nn (todo, known) AS (
     FROM nn
     WHERE nn.todo != '[]'
 )
---SELECT * FROM nn;
 INSERT INTO counts
 SELECT t.value->>'[0]', t.value->>'[1]', t.value->>'[2]'
 FROM nn, json_each(nn.known) t
