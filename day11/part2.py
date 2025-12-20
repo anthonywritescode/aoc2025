@@ -39,49 +39,47 @@ def compute_sqlike(s: str) -> int:
         k, rest = line.split(': ')
         edges[k] = rest.split()
 
-    seen = {(k, 'out') for k in edges}
-
-    unknown = set(seen)
-    known = {('out', 'out'): 1}
+    unknown = set(edges)
+    known = {'out': 1}
 
     while unknown:
         removed = []
-        for (k, v) in unknown:
-            if all((u, v) in known for u in edges[k]):
-                removed.append((k, v))
-                known[(k, v)] = sum(known[(u, v)] for u in edges[k])
+        for k in unknown:
+            if all(v in known for v in edges[k]):
+                removed.append(k)
+                known[k] = sum(known[u] for u in edges[k])
         unknown.difference_update(removed)
 
-    fft_out = known[('fft', 'out')]
-    dac_out = known[('dac', 'out')]
+    fft_out = known['fft']
+    dac_out = known['dac']
 
-    unknown = {(k, 'fft') for k in edges if k != 'fft'}
-    known = {('fft', 'fft'): 1, ('out', 'fft'): 0}
+    unknown = set(edges) - {'fft'}
+    known = {'fft': 1, 'out': 0}
 
     while unknown:
         removed = []
-        for (k, v) in unknown:
-            if all((u, v) in known for u in edges[k]):
-                removed.append((k, v))
-                known[(k, v)] = sum(known[(u, v)] for u in edges[k])
+        for k in unknown:
+            if all(v in known for v in edges[k]):
+                removed.append(k)
+                known[k] = sum(known[u] for u in edges[k])
         unknown.difference_update(removed)
 
-    svr_fft = known[('svr', 'fft')]
-    dac_fft = known[('dac', 'fft')]
+    svr_fft = known['svr']
+    dac_fft = known['dac']
 
-    unknown = {(k, 'dac') for k in edges if k != 'dac'}
-    known = {('dac', 'dac'): 1, ('out', 'dac'): 0}
+    unknown = set(edges) - {'dac'}
+    known = {'dac': 1, 'out': 0}
 
     while unknown:
         removed = []
-        for (k, v) in unknown:
-            if all((u, v) in known for u in edges[k]):
-                removed.append((k, v))
-                known[(k, v)] = sum(known[(u, v)] for u in edges[k])
+        for k in unknown:
+            if all(v in known for v in edges[k]):
+                removed.append(k)
+                known[k] = sum(known[u] for u in edges[k])
         unknown.difference_update(removed)
 
-    svr_dac = known[('svr', 'dac')]
-    fft_dac = known[('fft', 'dac')]
+    svr_dac = known['svr']
+    fft_dac = known['fft']
 
     return (svr_dac * dac_fft * fft_out + svr_fft * fft_dac * dac_out)
 

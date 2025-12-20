@@ -36,20 +36,18 @@ def compute_sqlike(s: str) -> int:
         k, rest = line.split(': ')
         edges[k] = rest.split()
 
-    seen = {(k, 'out') for k in edges}
-
-    unknown = set(seen)
-    known = {('out', 'out'): 1}
+    unknown = set(edges)
+    known = {'out': 1}
 
     while unknown:
         removed = []
-        for (k, v) in unknown:
-            if all((u, v) in known for u in edges[k]):
-                removed.append((k, v))
-                known[(k, v)] = sum(known[(u, v)] for u in edges[k])
+        for k in unknown:
+            if all(v in known for v in edges[k]):
+                removed.append(k)
+                known[k] = sum(known[u] for u in edges[k])
         unknown.difference_update(removed)
 
-    return known[('you', 'out')]
+    return known['you']
 
 
 INPUT_S = '''\
