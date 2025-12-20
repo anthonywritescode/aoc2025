@@ -34,9 +34,9 @@ FROM json_each((
     FROM input
 ));
 
-WITH RECURSIVE nn (paths, seen, dest, buttons) AS (
+WITH RECURSIVE nn (len, n, paths, seen, dest, buttons) AS (
     SELECT
-        '[[0,0]]', '[]',
+        NULL, NULL, '[0,0]', '_',
         (
             SELECT SUM(
                 (SUBSTR(dest, LENGTH(dest) - n.value, 1) = '#') <<
@@ -53,34 +53,41 @@ WITH RECURSIVE nn (paths, seen, dest, buttons) AS (
     FROM parsed
     UNION ALL
     SELECT
-        (
-            SELECT json_group_array(json(arr)) FROM (
-                SELECT value AS arr
-                FROM json_each(json_remove(nn.paths, '$[0]'))
-                UNION ALL
-                SELECT json_array(
-                    nn.paths->>0->>0 + 1,
-                    -- xor, lol
-                    (~(nn.paths->>0->>1 & value)) & (nn.paths->>0->>1 | value)
+        CASE
+            WHEN nn.len IS NULL THEN
+                SUBSTR(nn.paths, 1, INSTR(nn.paths, ']'))->>0
+            ELSE NULL
+        END,
+        CASE
+            WHEN nn.len IS NULL THEN
+                SUBSTR(nn.paths, 1, INSTR(nn.paths, ']'))->>1
+            ELSE NULL
+        END,
+        CASE
+            WHEN nn.len IS NULL THEN
+                SUBSTR(nn.paths, INSTR(nn.paths, ']') + 1)
+            WHEN nn.seen LIKE '%_' || nn.n || '_%' THEN nn.paths
+            ELSE
+                nn.paths || (
+                    SELECT group_concat(
+                        json_array(
+                            nn.len + 1,
+                            -- xor, lol
+                            (~(nn.n & value)) & (nn.n | value)
+                        ),
+                        ''
+                    )
+                    FROM json_each(nn.buttons)
                 )
-                FROM json_each(nn.buttons)
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM json_each(nn.seen)
-                    WHERE value = nn.paths->>0->>1
-                )
-            )
-        ),
-        (
-            SELECT json_group_array(n) FROM (
-                SELECT value AS n
-                FROM json_each(nn.seen)
-                UNION
-                SELECT nn.paths->>0->>1
-            )
-        ),
+        END,
+        CASE
+            WHEN nn.len IS NULL THEN nn.seen
+            WHEN nn.seen LIKE '%_' || nn.n || '_%' THEN nn.seen
+            ELSE nn.seen || nn.n || '_'
+        END,
         nn.dest,
         nn.buttons
     FROM nn
-    WHERE nn.paths->>0->>1 != nn.dest
+    WHERE nn.n is null or nn.n != nn.dest
 )
-SELECT SUM(nn.paths->>0->>0) FROM nn WHERE nn.paths->>0->>1 = nn.dest;
+SELECT SUM(nn.len) FROM nn WHERE nn.n = nn.dest;
