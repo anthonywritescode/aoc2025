@@ -159,10 +159,10 @@ def _reduce(rows: list[tuple[int, ...]]) -> list[tuple[int, ...]]:
             k += 1
         else:
             mut[h], mut[i_max] = mut[i_max], mut[h]
+            den = mut[h][k]
             for i in range(h + 1, m):
-                num, den = mut[i][k], mut[h][k]
-                mut[i][k] = 0
-                for j in range(k + 1, n):
+                num = mut[i][k]
+                for j in range(k, n):
                     mut[i][j] = mut[i][j] * den - mut[h][j] * num
             h += 1
             k += 1
