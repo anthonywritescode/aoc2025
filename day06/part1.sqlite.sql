@@ -56,8 +56,8 @@ WITH RECURSIVE nn (acc, op, arr) AS (
 
     SELECT
         CASE nn.op
-            WHEN '+' THEN nn.acc + nn.arr->>'[0]'
-            WHEN '*' THEN nn.acc * nn.arr->>'[0]'
+            WHEN '+' THEN nn.acc + nn.arr->>0
+            WHEN '*' THEN nn.acc * nn.arr->>0
             ELSE '???'
         END,
         nn.op,

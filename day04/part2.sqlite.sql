@@ -46,7 +46,7 @@ WITH RECURSIVE nn (total, state) AS (
         -- total
         nn.total + (
             SELECT COUNT(1) FROM json_each(nn.state)
-            WHERE value->>'[2]' < 4
+            WHERE value->>2 < 4
         ),
         -- state
         (
@@ -55,35 +55,35 @@ WITH RECURSIVE nn (total, state) AS (
                 FROM (
                     -- existing data
                     SELECT
-                        value->>'[0]' AS x,
-                        value->>'[1]' AS y,
-                        value->>'[2]' AS n
+                        value->>0 AS x,
+                        value->>1 AS y,
+                        value->>2 AS n
                     FROM json_each(nn.state)
-                    WHERE value->>'[2]' >= 4
+                    WHERE value->>2 >= 4
 
                     UNION ALL
 
                     -- subtractions
                     SELECT
-                        value->>'[0]' + dx AS x,
-                        value->>'[1]' + dy AS y,
+                        value->>0 + dx AS x,
+                        value->>1 + dy AS y,
                         -1 AS n
                     FROM json_each(nn.state)
                     INNER JOIN adj8
                     INNER JOIN coords ON
-                        coords.x = value->>'[0]' + dx AND
-                        coords.y = value->>'[1]' + dy
-                    WHERE value->>'[2]' < 4
+                        coords.x = value->>0 + dx AND
+                        coords.y = value->>1 + dy
+                    WHERE value->>2 < 4
                 ) _
                 GROUP BY x, y
             ) _2
             -- if we delete two adjacent some things go negative :(
-            WHERE json(r)->>'[2]' >= 0
+            WHERE json(r)->>2 >= 0
         )
     FROM nn
     WHERE (
         SELECT COUNT(1) FROM json_each(nn.state)
-        WHERE value->>'[2]' < 4
+        WHERE value->>2 < 4
     ) > 0
 )
 SELECT MAX(total) FROM nn;

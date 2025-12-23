@@ -3,7 +3,7 @@ INSERT INTO input VALUES (TRIM(readfile('input.txt'), char(10)));
 
 CREATE TABLE points (x INT, y INT, z INT);
 INSERT INTO points
-SELECT value->>'[0]', value->>'[1]', value->>'[2]'
+SELECT value->>0, value->>1, value->>2
 FROM json_each((
     SELECT '[[' || REPLACE(s, char(10), '],[') || ']]'
     FROM input

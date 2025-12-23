@@ -24,13 +24,13 @@ WITH RECURSIVE nn (rid, positions) AS (
                 SELECT k, SUM(v) AS v
                 FROM (
                     SELECT
-                        value->>'[0]' + coalesce(d, 0) AS k,
-                        value->>'[1]' AS v
+                        value->>0 + coalesce(d, 0) AS k,
+                        value->>1 AS v
                     FROM json_each(nn.positions)
                     LEFT OUTER JOIN splitme ON
                         SUBSTR(
                             (SELECT s FROM lines WHERE ROWID = nn.rid),
-                            value->>'[0]',
+                            value->>0,
                             1
                         ) = '^'
                 ) _
@@ -40,7 +40,7 @@ WITH RECURSIVE nn (rid, positions) AS (
     FROM nn
     WHERE nn.rid <= (SELECT MAX(ROWID) FROM lines)
 )
-SELECT SUM(value->>'[1]') FROM json_each((
+SELECT SUM(value->>1) FROM json_each((
     SELECT positions FROM nn
     WHERE nn.rid = (SELECT MAX(ROWID) FROM lines)
 ));

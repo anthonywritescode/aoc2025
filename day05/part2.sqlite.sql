@@ -10,12 +10,12 @@ FROM input;
 
 CREATE TABLE ranges (s INT, e INT);
 INSERT INTO ranges
-SELECT value->>'[0]', value->>'[1]'
+SELECT value->>0, value->>1
 FROM json_each((
     SELECT '[[' || REPLACE(REPLACE(ranges, char(10), '],['), '-', ',') || ']]'
     FROM input2
 ))
-ORDER BY value->>'[0]';
+ORDER BY value->>0;
 
 CREATE TABLE new_ranges (s INT, e INT);
 WITH RECURSIVE nn (nrid, s, e) AS (
