@@ -9,11 +9,8 @@ FROM json_each((
     FROM input
 ));
 
-WITH RECURSIVE nn (n, e) AS (
-    SELECT s, e FROM ranges
-    UNION ALL
-    SELECT nn.n + 1, e FROM nn
-    WHERE nn.n < e
-)
-SELECT SUM(n) FROM nn
-WHERE SUBSTR(n, 1, LENGTH(n) / 2) = SUBSTR(n, LENGTH(n) / 2 + 1);
+SELECT SUM(n.value) FROM ranges, generate_series(s, e) n
+WHERE
+    SUBSTR(n.value, 1, LENGTH(n.value) / 2) =
+    SUBSTR(n.value, LENGTH(n.value) / 2 + 1)
+;
