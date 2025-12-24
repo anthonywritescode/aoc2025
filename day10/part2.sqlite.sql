@@ -58,11 +58,7 @@ SELECT
     json_insert(
         (
             SELECT json_group_array(
-                (
-                    SELECT COUNT(1)
-                    FROM json_each(json(b.value)) i
-                    WHERE i.value = o.key+0
-                )
+                o.key IN (SELECT value FROM json_each(b.value))
             )
             FROM json_each(parsed.buttons) b
         ),
