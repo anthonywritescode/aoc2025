@@ -11,22 +11,15 @@ SELECT value FROM json_each((
     FROM input
 ));
 
-WITH RECURSIVE nn (total, pos, rid) AS (
-    SELECT 0, 50, 1
-    UNION ALL
-    SELECT
-        (
-            nn.total +
-            ABS((SELECT n FROM dials WHERE ROWID = nn.rid)) / 100 +
-            (
-                nn.pos > 0 AND
-                nn.pos + (SELECT n FROM dials WHERE ROWID = nn.rid) % 100 <= 0
-            ) +
-            (nn.pos + (SELECT n FROM dials WHERE ROWID = nn.rid) % 100 >= 100)
-        ),
-        (nn.pos + (SELECT n FROM dials WHERE ROWID = nn.rid) + 1000) % 100,
-        nn.rid + 1
-    FROM nn
-    WHERE nn.rid <= (SELECT MAX(ROWID) FROM dials)
+CREATE TABLE landed (n INT);
+INSERT INTO landed VALUES (50);
+INSERT INTO landed
+SELECT (1000050 + n) % 100
+FROM (SELECT SUM(n) OVER (ORDER BY ROWID) AS n FROM dials);
+
+SELECT SUM(
+    abs(dials.n) / 100 +
+    ((landed.n + (dials.n % 100)) >= 100) +
+    (landed.n > 0 AND ((landed.n + (dials.n % 100)) <= 0))
 )
-SELECT MAX(total) FROM nn;
+FROM landed, dials WHERE landed.ROWID = dials.ROWID;
