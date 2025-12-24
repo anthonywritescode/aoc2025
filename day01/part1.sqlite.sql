@@ -11,13 +11,5 @@ SELECT value FROM json_each((
     FROM input
 ));
 
-WITH RECURSIVE nn (pos, rid) AS (
-    SELECT 50, 1
-    UNION ALL
-    SELECT
-        (nn.pos + (SELECT n FROM dials WHERE ROWID = nn.rid) + 1000) % 100,
-        nn.rid + 1
-    FROM nn
-    WHERE nn.rid <= (SELECT MAX(ROWID) FROM dials)
-)
-SELECT COUNT(1) FROM nn WHERE pos = 0;
+SELECT COUNT(1) FROM (SELECT SUM(n) OVER (ORDER BY ROWID) AS n FROM dials)
+WHERE (1000050 + n) % 100 = 0;
