@@ -70,20 +70,15 @@ WITH RECURSIVE nn (total, state) AS (
                         -1 AS n
                     FROM json_each(nn.state)
                     INNER JOIN adj8
-                    INNER JOIN coords ON
-                        coords.x = value->>0 + dx AND
-                        coords.y = value->>1 + dy
                     WHERE value->>2 < 4
-                ) _
+                )
                 GROUP BY x, y
-            ) _2
+            )
             -- if we delete two adjacent some things go negative :(
             WHERE json(r)->>2 >= 0
         )
     FROM nn
-    WHERE (
-        SELECT COUNT(1) FROM json_each(nn.state)
-        WHERE value->>2 < 4
-    ) > 0
+    -- this is mildly faster: WHERE nn.state GLOB '*,[0123]]*'
+    WHERE EXISTS (SELECT 1 FROM json_each(nn.state) WHERE value->>2 < 4)
 )
 SELECT MAX(total) FROM nn;
